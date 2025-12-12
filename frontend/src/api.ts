@@ -1,6 +1,6 @@
 import { Dataset, ExpectationSuite, ValidationResult, DbConnectionConfig } from '../types';
 
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = '/api/v1';
 
 export const api = {
     async uploadFile(file: File): Promise<{ filename: string, file_path: string, headers: string[], sample_rows: any[] }> {
