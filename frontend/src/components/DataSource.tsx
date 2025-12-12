@@ -28,6 +28,17 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset })
 
   const { t } = useLanguage();
 
+  // Simple UUID generator for non-secure contexts
+  const generateId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const file = e.target.files?.[0];
@@ -39,7 +50,7 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset })
 
       // 2. Create Dataset record
       const newDataset: Partial<Dataset> = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         name: file.name,
         headers: headers || [],
         rows: sample_rows || [],
@@ -56,6 +67,7 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset })
       }
 
     } catch (err) {
+      console.error("Upload error:", err);
       setError(t.dataSource.parseError);
     }
   };
@@ -73,7 +85,7 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset })
     if (type === 'SQLite') setDbPort('');
 
     // Pre-fill sample data to help user understand what to do
-    setSampleData("id,user_id,amount,status,created_at\n1,u_101,99.50,completed,2023-01-01\n2,u_102,12.00,pending,2023-01-02\n3,u_103,45.00,failed,2023-01-03");
+    setSampleData("id,user_id,amount,status,created_at\\n1,u_101,99.50,completed,2023-01-01\\n2,u_102,12.00,pending,2023-01-02\\n3,u_103,45.00,failed,2023-01-03");
   };
 
   const handleDbConnect = () => {
@@ -122,7 +134,7 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset })
         const previewData = await api.previewDataset(tempDatasetForPreview);
 
         const newDataset: Partial<Dataset> = {
-          id: crypto.randomUUID(),
+          id: generateId(),
           name: `${showDbModal}: ${dbTable}`,
           headers: previewData.headers || [],
           rows: previewData.rows || [],
