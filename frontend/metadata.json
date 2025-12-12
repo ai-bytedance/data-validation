@@ -1,0 +1,5 @@
+{
+  "name": "数据质量验证平台",
+  "description": "基于 Great Expectations 的可视化数据验证管理系统。具有 AI 驱动的期望生成、客户端验证模拟和代码导出功能。",
+  "requestFramePermissions": []
+}
