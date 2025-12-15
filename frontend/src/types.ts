@@ -54,6 +54,7 @@ export interface Expectation {
 
 export interface ExpectationSuite {
   id: string;
+  dataset_id: string;
   name: string;
   expectations: Expectation[];
 }

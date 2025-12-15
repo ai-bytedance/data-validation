@@ -59,7 +59,7 @@ const MainApp: React.FC = () => {
     setDataset(newDataset);
     // Auto-create a default suite container for convenience
     if (suites.length === 0) {
-      setSuites([{ id: generateId(), name: 'Default Suite', expectations: [] }]);
+      setSuites([{ id: generateId(), name: 'Default Suite', dataset_id: newDataset.id, expectations: [] }]);
     }
   };
 
