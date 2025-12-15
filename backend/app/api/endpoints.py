@@ -113,6 +113,8 @@ async def run_validation(dataset_id: str, suite_id: str, session: Session = Depe
     try:
         raw_result = await gx_service.run_validation(dataset, suite)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     
     # Parse Result for Summary

@@ -126,8 +126,28 @@ async def run_validation(dataset: Dataset, suite: ExpectationSuite) -> Dict[str,
                 }
             ]
         )
-        results = checkpoint.run()
-        result_dict = results.to_json_dict()
+        try:
+            results = checkpoint.run()
+            result_dict = results.to_json_dict()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            # Return a synthetic failure result so the frontend can display it
+            result_dict = {
+                "success": False,
+                "run_results": {
+                    "error": {
+                        "validation_result": {
+                            "success": False,
+                            "statistics": {
+                                "success": False,
+                                "success_percent": 0.0,
+                                "observed_value": f"Critical Validation Error: {str(e)}"
+                            }
+                        }
+                    }
+                }
+            }
     else:
         # Minimal empty result structure
         result_dict = {"run_results": {}, "success": True}
