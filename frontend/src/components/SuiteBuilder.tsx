@@ -28,7 +28,7 @@ const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) 
   const handleAddManual = () => {
     if (!activeSuite || !dataset) return;
     const newExp: Expectation = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       column: dataset.headers[0],
       type: ExpectationType.NOT_NULL,
       kwargs: {},
