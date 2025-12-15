@@ -14,7 +14,7 @@ router = APIRouter()
 
 # --- Datasets ---
 
-@router.post("/datasetås", response_model=Dataset)
+@router.post("/datasets", response_model=Dataset)
 def create_dataset(dataset: Dataset, session: Session = Depends(get_session)):
     # If it is a DB dataset, try to fetch schema metadata automatically
     if dataset.db_config:
