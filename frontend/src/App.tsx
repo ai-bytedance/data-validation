@@ -25,15 +25,30 @@ const MainApp: React.FC = () => {
 
   const { language, setLanguage, t } = useLanguage();
 
+  // Polyfill for randomUUID
+  const generateId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
   // Load Initial Data
   React.useEffect(() => {
     const load = async () => {
-      const ds = await api.getDatasets();
-      if (ds.length > 0) setDataset(ds[0]); // Default to first for MVP
-      const s = await api.getSuites();
-      setSuites(s);
-      const h = await api.getHistory();
-      setValidationHistory(h);
+      try {
+        const ds = await api.getDatasets();
+        if (ds && ds.length > 0) setDataset(ds[0]);
+        const s = await api.getSuites();
+        setSuites(s || []); // Guard against null
+        const h = await api.getHistory();
+        setValidationHistory(h || []); // Guard against null
+      } catch (err) {
+        console.warn("Failed to load initial data", err);
+      }
     };
     load();
   }, []);
@@ -44,7 +59,7 @@ const MainApp: React.FC = () => {
     setDataset(newDataset);
     // Auto-create a default suite container for convenience
     if (suites.length === 0) {
-      setSuites([{ id: crypto.randomUUID(), name: 'Default Suite', expectations: [] }]);
+      setSuites([{ id: generateId(), name: 'Default Suite', expectations: [] }]);
     }
   };
 
