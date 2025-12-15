@@ -21,14 +21,24 @@ export const api = {
             body: JSON.stringify(dataset)
         });
         if (!res.ok) throw new Error('Failed to create dataset');
-        return res.json();
+        const d = await res.json();
+        return {
+            ...d,
+            headers: d.headers || dataset.headers || [],
+            rows: d.rows || dataset.rows || []
+        };
     },
 
     async getDatasets(): Promise<Dataset[]> {
         const res = await fetch(`${API_BASE}/datasets`);
         if (!res.ok) throw new Error('Failed to fetch datasets');
         try {
-            return res.json();
+            const list: Dataset[] = await res.json();
+            return list.map(d => ({
+                ...d,
+                headers: d.headers || [],
+                rows: d.rows || []
+            }));
         } catch {
             return [];
         }
