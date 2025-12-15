@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { generateId } from '../utils';
 import { Dataset, ExpectationSuite, Expectation, ExpectationType } from '../types';
 import { api } from '../api';
 import { Plus, Wand2, Trash2, Save, Download, Code, Loader2, ChevronDown, Table as TableIcon, BrainCircuit, Sparkles } from 'lucide-react';
@@ -58,7 +59,7 @@ const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) 
     try {
       const suggestions = await api.suggestExpectations(dataset.id);
       if (activeSuite) {
-        const newExps = suggestions.map((s: any) => ({ ...s, id: crypto.randomUUID() }));
+        const newExps = suggestions.map((s: any) => ({ ...s, id: generateId() }));
         onSave({
           ...activeSuite,
           expectations: [...activeSuite.expectations, ...newExps]
@@ -110,10 +111,10 @@ const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) 
             onClick={handleExportCode}
             disabled={aiLoading || codeLoading}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors border ${codeLoading
-                ? 'bg-slate-800 text-white cursor-wait opacity-100'
-                : aiLoading
-                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-sm'
+              ? 'bg-slate-800 text-white cursor-wait opacity-100'
+              : aiLoading
+                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-sm'
               }`}
           >
             {codeLoading ? <Loader2 className="animate-spin" size={18} /> : <Code size={18} />}
@@ -146,8 +147,8 @@ const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) 
               onClick={handleAiSuggest}
               disabled={aiLoading || codeLoading}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg transition-all shadow-sm text-sm font-bold whitespace-nowrap ${aiLoading
-                  ? 'bg-gradient-to-r from-orange-400 to-pink-500 text-white cursor-wait opacity-80'
-                  : 'bg-gradient-to-r from-orange-500 to-pink-600 text-white hover:shadow-md hover:scale-[1.02] active:scale-95'
+                ? 'bg-gradient-to-r from-orange-400 to-pink-500 text-white cursor-wait opacity-80'
+                : 'bg-gradient-to-r from-orange-500 to-pink-600 text-white hover:shadow-md hover:scale-[1.02] active:scale-95'
                 }`}
             >
               {aiLoading ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}

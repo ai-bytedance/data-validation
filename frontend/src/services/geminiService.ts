@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { Expectation, ExpectationType, Language, DbConnectionConfig, AiConfig } from "../types";
+import { generateId } from "../utils";
 
 const getAiClient = (apiKeyOverride?: string) => {
   // Use override if present, otherwise default to env var
@@ -12,7 +13,7 @@ const getAiClient = (apiKeyOverride?: string) => {
 };
 
 export const generateExpectationsFromData = async (
-  csvHead: string, 
+  csvHead: string,
   columns: string[],
   language: Language,
   aiConfig: AiConfig, // Accept config
@@ -20,12 +21,12 @@ export const generateExpectationsFromData = async (
 ): Promise<Expectation[]> => {
   try {
     const ai = getAiClient(aiConfig.apiKey); // Pass the optional key
-    
-    const langInstruction = language === 'zh' 
-      ? 'Ensure the "description" field for each expectation is in Chinese (Simplified Chinese).' 
+
+    const langInstruction = language === 'zh'
+      ? 'Ensure the "description" field for each expectation is in Chinese (Simplified Chinese).'
       : 'Ensure the "description" field for each expectation is in English.';
 
-    const domainInstruction = domainContext 
+    const domainInstruction = domainContext
       ? `THE DATA DOMAIN IS: "${domainContext}". \nIMPORTANT: Generate expectations that are SPECIFIC to this domain. For example, if the domain is 'Academic Papers', check for valid DOI formats using regex, publication years within reasonable ranges, or specific citation styles.`
       : '';
 
@@ -68,8 +69,8 @@ export const generateExpectationsFromData = async (
             type: Type.OBJECT,
             properties: {
               column: { type: Type.STRING },
-              type: { 
-                type: Type.STRING, 
+              type: {
+                type: Type.STRING,
                 enum: [
                   'expect_column_values_to_not_be_null',
                   'expect_column_values_to_be_unique',
@@ -107,11 +108,11 @@ export const generateExpectationsFromData = async (
     });
 
     const rawExpectations = JSON.parse(response.text || "[]");
-    
+
     // Map to our internal ID structure
     return rawExpectations.map((ex: any) => ({
       ...ex,
-      id: crypto.randomUUID(),
+      id: generateId(),
       // Ensure kwargs is clean
       kwargs: ex.kwargs || {}
     }));
@@ -123,24 +124,24 @@ export const generateExpectationsFromData = async (
 };
 
 export const generatePythonCode = async (
-    suiteName: string, 
-    expectations: Expectation[], 
-    dbConfig?: DbConnectionConfig,
-    aiConfig?: AiConfig // Accept config for commenting in python code
+  suiteName: string,
+  expectations: Expectation[],
+  dbConfig?: DbConnectionConfig,
+  aiConfig?: AiConfig // Accept config for commenting in python code
 ): Promise<string> => {
-    try {
-        // Here we just use the default client to generate the code itself
-        // But we might want to embed the configured key/model in the python script comments
-        const ai = getAiClient(aiConfig?.apiKey); 
-        
-        let dataSourcePrompt = `
+  try {
+    // Here we just use the default client to generate the code itself
+    // But we might want to embed the configured key/model in the python script comments
+    const ai = getAiClient(aiConfig?.apiKey);
+
+    let dataSourcePrompt = `
             # Use Pandas Dataframe by default
             df = pd.read_csv('your_data.csv')
             context.sources.add_pandas(name="my_pandas_datasource").read_csv("data.csv")
         `;
 
-        if (dbConfig) {
-            dataSourcePrompt = `
+    if (dbConfig) {
+      dataSourcePrompt = `
             # The user has configured a REAL database connection.
             # Generate code using 'great_expectations' to connect to this SQL database:
             # Type: ${dbConfig.type}
@@ -154,13 +155,13 @@ export const generatePythonCode = async (
             # Use 'context.sources.add_sql' or equivalent modern GX API to configure the datasource.
             # Create a Batch Request for the table '${dbConfig.table}'.
             `;
-        }
+    }
 
-        const modelConfigNote = aiConfig && aiConfig.apiKey 
-            ? `# Note: User configured specific AI model: ${aiConfig.modelName}` 
-            : `# Note: Using default AI environment`;
+    const modelConfigNote = aiConfig && aiConfig.apiKey
+      ? `# Note: User configured specific AI model: ${aiConfig.modelName}`
+      : `# Note: Using default AI environment`;
 
-        const prompt = `
+    const prompt = `
             Generate a complete Python script using the 'great_expectations' library (GX 0.16+ style).
             
             SETUP:
@@ -189,16 +190,16 @@ export const generatePythonCode = async (
             Return the raw Python code. Do not wrap in markdown blocks.
         `;
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-        });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
 
-        let text = response.text || "";
-        text = text.replace(/```python/g, '').replace(/```/g, '');
-        return text;
-    } catch (error) {
-        console.error("Code gen failed", error);
-        return "# Error generating code. Please check API Key.";
-    }
+    let text = response.text || "";
+    text = text.replace(/```python/g, '').replace(/```/g, '');
+    return text;
+  } catch (error) {
+    console.error("Code gen failed", error);
+    return "# Error generating code. Please check API Key.";
+  }
 }
