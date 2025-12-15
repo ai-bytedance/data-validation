@@ -25,7 +25,7 @@ class DatasetBase(SQLModel):
     db_config: Optional[Dict[str, Any]] = Field(default=None, sa_type=JSON) 
 
 class Dataset(DatasetBase, table=True):
-    id: Optional[UUID] = Field(default_factory=uuid4, primary_key=True)
+    id: Optional[str] = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
@@ -34,10 +34,10 @@ class Dataset(DatasetBase, table=True):
 
 class ExpectationSuiteBase(SQLModel):
     name: str
-    dataset_id: UUID = Field(foreign_key="dataset.id")
+    dataset_id: str = Field(foreign_key="dataset.id")
 
 class ExpectationSuite(ExpectationSuiteBase, table=True):
-    id: Optional[UUID] = Field(default_factory=uuid4, primary_key=True)
+    id: Optional[str] = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Store expectations as a JSON blob for simplicity, 
@@ -50,14 +50,14 @@ class ExpectationSuite(ExpectationSuiteBase, table=True):
 
 
 class ValidationRunBase(SQLModel):
-    suite_id: UUID = Field(foreign_key="expectationsuite.id")
+    suite_id: str = Field(foreign_key="expectationsuite.id")
     success: bool
     score: float
     # Stores the full JSON result from Great Expectations
     result_json: Dict[str, Any] = Field(default={}, sa_type=JSON)
 
 class ValidationRun(ValidationRunBase, table=True):
-    id: Optional[UUID] = Field(default_factory=uuid4, primary_key=True)
+    id: Optional[str] = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     run_time: datetime = Field(default_factory=datetime.utcnow)
     
     suite: ExpectationSuite = Relationship(back_populates="validation_runs")
