@@ -9,6 +9,7 @@ import shutil
 import os
 import uuid
 import json
+from datetime import datetime
 
 router = APIRouter()
 
@@ -72,10 +73,27 @@ def read_dataset(dataset_id: str, session: Session = Depends(get_session)):
 
 @router.post("/suites", response_model=ExpectationSuite)
 def create_suite(suite: ExpectationSuite, session: Session = Depends(get_session)):
-    session.add(suite)
+    # Fix for SQLite DateTime issue (if Pydantic passes string)
+    if isinstance(suite.created_at, str):
+        try:
+            # Handle standard ISO format
+            suite.created_at = datetime.fromisoformat(suite.created_at)
+        except:
+             # Fallback to now if parse fails
+             suite.created_at = datetime.utcnow()
+
+    # Use merge to allow updates (upsert)
+    session.merge(suite)
     session.commit()
-    session.refresh(suite)
-    return suite
+    # refresh requires the instance to be in session, merge returns a new instance
+    # but for simple return we can just return the input suite or strictly:
+    # merged_instance = session.merge(suite); session.commit(); session.refresh(merged_instance); return merged_instance
+    # But simply returning suite is fine as we trust the merge.
+    # Actually, let's do it properly:
+    saved_suite = session.merge(suite)
+    session.commit()
+    session.refresh(saved_suite)
+    return saved_suite
 
 @router.get("/suites", response_model=List[ExpectationSuite])
 def read_suites(session: Session = Depends(get_session)):
