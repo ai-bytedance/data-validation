@@ -29,7 +29,7 @@ class Dataset(DatasetBase, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
-    suites: List["ExpectationSuite"] = Relationship(back_populates="dataset")
+    suites: List["ExpectationSuite"] = Relationship(back_populates="dataset", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 
 class ExpectationSuiteBase(SQLModel):
@@ -46,7 +46,7 @@ class ExpectationSuite(ExpectationSuiteBase, table=True):
     expectations: List[Dict[str, Any]] = Field(default=[], sa_type=JSON) 
 
     dataset: Dataset = Relationship(back_populates="suites")
-    validation_runs: List["ValidationRun"] = Relationship(back_populates="suite")
+    validation_runs: List["ValidationRun"] = Relationship(back_populates="suite", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 
 class ValidationRunBase(SQLModel):

@@ -14,7 +14,7 @@ interface SuiteBuilderProps {
 }
 
 const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) => {
-  const [activeSuiteId, setActiveSuiteId] = useState<string>(suites[0]?.id || '');
+  const [activeSuiteId, setActiveSuiteId] = useState<string>('');
   const [aiLoading, setAiLoading] = useState(false);
   const [codeLoading, setCodeLoading] = useState(false);
   const [showCode, setShowCode] = useState(false);
@@ -23,10 +23,24 @@ const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) 
   const { t, language } = useLanguage();
   const { aiConfig } = useSettings();
 
-  const activeSuite = suites.find(s => s.id === activeSuiteId) || suites[0];
+  // Filter suites relevant to this dataset
+  const relatedSuites = suites.filter(s => s.dataset_id === dataset?.id);
+
+  // Reset active suite when dataset changes
+  React.useEffect(() => {
+    if (relatedSuites.length > 0) {
+      setActiveSuiteId(relatedSuites[0].id);
+    } else {
+      setActiveSuiteId('');
+    }
+  }, [dataset?.id, relatedSuites.length]);
+
+  const activeSuite = relatedSuites.find(s => s.id === activeSuiteId) || relatedSuites[0];
 
   const handleAddManual = () => {
-    if (!activeSuite || !dataset) return;
+    if (!dataset) return;
+
+    // Create new expectation
     const newExp: Expectation = {
       id: generateId(),
       column: dataset.headers[0],
@@ -34,11 +48,26 @@ const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) 
       kwargs: {},
       description: t.builder.manualDesc as string
     };
-    const updatedSuite = {
-      ...activeSuite,
-      expectations: [...activeSuite.expectations, newExp]
-    };
-    onSave(updatedSuite);
+
+    if (activeSuite) {
+      // Append to existing suite
+      const updatedSuite = {
+        ...activeSuite,
+        expectations: [...activeSuite.expectations, newExp]
+      };
+      onSave(updatedSuite);
+    } else {
+      // Create new suite if none exists
+      const newSuiteId = generateId();
+      const newSuite: ExpectationSuite = {
+        id: newSuiteId,
+        dataset_id: dataset.id,
+        name: 'Default Suite',
+        expectations: [newExp]
+      };
+      onSave(newSuite);
+      setActiveSuiteId(newSuiteId);
+    }
   };
 
   const handleUpdateExp = (id: string, updates: Partial<Expectation>) => {
@@ -58,12 +87,23 @@ const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) 
     setAiLoading(true);
     try {
       const suggestions = await api.suggestExpectations(dataset.id);
+      const newExps = suggestions.map((s: any) => ({ ...s, id: generateId() }));
+
       if (activeSuite) {
-        const newExps = suggestions.map((s: any) => ({ ...s, id: generateId() }));
         onSave({
           ...activeSuite,
           expectations: [...activeSuite.expectations, ...newExps]
         });
+      } else {
+        const newSuiteId = generateId();
+        const newSuite: ExpectationSuite = {
+          id: newSuiteId,
+          dataset_id: dataset.id,
+          name: 'AI Generated Suite',
+          expectations: newExps,
+        };
+        onSave(newSuite);
+        setActiveSuiteId(newSuiteId);
       }
     } catch (e) {
       console.error(e);
@@ -134,8 +174,8 @@ const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) 
             <div className="flex flex-col gap-1 w-full">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t.builder.currentSuite}</label>
               <input
-                value={activeSuite?.name}
-                onChange={(e) => onSave({ ...activeSuite, name: e.target.value })}
+                value={activeSuite?.name || ''}
+                onChange={(e) => activeSuite && onSave({ ...activeSuite, name: e.target.value })}
                 className="bg-transparent border-none p-0 text-slate-800 font-bold focus:ring-0 text-lg placeholder-slate-300 w-full sm:w-64"
                 placeholder="Suite Name"
               />
@@ -164,7 +204,7 @@ const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) 
           </div>
         </div>
 
-        {activeSuite?.expectations.length === 0 ? (
+        {(!activeSuite || activeSuite.expectations.length === 0) ? (
           <div className="p-16 text-center">
             <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
               <Sparkles size={40} />
@@ -176,7 +216,7 @@ const SuiteBuilder: React.FC<SuiteBuilderProps> = ({ dataset, suites, onSave }) 
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {activeSuite.expectations.map((exp, idx) => (
+            {activeSuite?.expectations.map((exp, idx) => (
               <div key={exp.id} className="p-4 hover:bg-slate-50 transition-colors group">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start md:items-center">
                   <div className="col-span-1 text-slate-400 font-mono text-sm hidden md:block">#{idx + 1}</div>

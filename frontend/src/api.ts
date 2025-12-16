@@ -1,4 +1,4 @@
-import { Dataset, ExpectationSuite, ValidationResult, DbConnectionConfig } from '../types';
+import { Dataset, ExpectationSuite, ValidationResult, DbConnectionConfig } from './types';
 
 const API_BASE = '/api/v1';
 
@@ -44,6 +44,26 @@ export const api = {
         }
     },
 
+    async getDataset(id: string): Promise<Dataset> {
+        const res = await fetch(`${API_BASE}/datasets/${id}`);
+        if (!res.ok) throw new Error('Failed to fetch dataset');
+        const d = await res.json();
+        return {
+            ...d,
+            headers: d.headers || [],
+            rows: d.rows || []
+        };
+    },
+
+    async deleteDataset(id: string): Promise<void> {
+        const res = await fetch(`${API_BASE}/datasets/${id}`, {
+            method: 'DELETE'
+        });
+        // If 404, it's already gone, so we consider it a success for the frontend state
+        if (res.status === 404) return;
+        if (!res.ok) throw new Error('Failed to delete dataset');
+    },
+
     async createSuite(suite: Partial<ExpectationSuite>): Promise<ExpectationSuite> {
         const res = await fetch(`${API_BASE}/suites`, {
             method: 'POST',
@@ -79,6 +99,12 @@ export const api = {
             body: JSON.stringify(datasetId) // Body(...) expects scalar or json depending on config, but usually standard JSON
         });
         return res.json();
+    },
+
+    async deleteRun(runId: string): Promise<void> {
+        await fetch(`${API_BASE}/runs/${runId}`, {
+            method: 'DELETE'
+        });
     },
 
     async generateCode(suiteId: string): Promise<{ code: string }> {

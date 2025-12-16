@@ -3,6 +3,7 @@ import { ValidationResult, Dataset, ViewState } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { CheckCircle, XCircle, FileInput, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatDate } from '../utils/formatters';
 
 interface DashboardProps {
   history: ValidationResult[];
@@ -61,7 +62,7 @@ const Dashboard: React.FC<DashboardProps> = ({ history, dataset, onNavigate }) =
             </div>
           </div>
         </div>
-         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-medium text-slate-500">{t.dashboard.currentDataset}</p>
@@ -69,7 +70,7 @@ const Dashboard: React.FC<DashboardProps> = ({ history, dataset, onNavigate }) =
                 {dataset ? dataset.name : t.dashboard.none}
               </h3>
               {!dataset && (
-                 <button onClick={() => onNavigate('DATA_SOURCE')} className="text-xs text-orange-600 font-medium hover:underline mt-1">{t.dashboard.connectData} &rarr;</button>
+                <button onClick={() => onNavigate('DATA_SOURCE')} className="text-xs text-orange-600 font-medium hover:underline mt-1">{t.dashboard.connectData} &rarr;</button>
               )}
             </div>
             <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
@@ -83,17 +84,17 @@ const Dashboard: React.FC<DashboardProps> = ({ history, dataset, onNavigate }) =
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-80">
           <h3 className="text-lg font-semibold text-slate-800 mb-6">{t.dashboard.trendTitle}</h3>
           {history.length === 0 ? (
-             <div className="h-full flex flex-col items-center justify-center text-slate-400">
-               <ShieldAlert size={48} className="mb-2 opacity-50" />
-               <p>{t.dashboard.noData}</p>
-             </div>
+            <div className="h-full flex flex-col items-center justify-center text-slate-400">
+              <ShieldAlert size={48} className="mb-2 opacity-50" />
+              <p>{t.dashboard.noData}</p>
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height="80%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" tick={{fontSize: 12}} stroke="#94a3b8" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                 <YAxis stroke="#94a3b8" />
-                <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value, name) => [value, name === 'score' ? t.dashboard.score : name]} labelStyle={{ color: '#475569' }} />
+                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(value, name) => [value, name === 'score' ? t.dashboard.score : name]} labelStyle={{ color: '#475569' }} />
                 <Bar dataKey="score" radius={[4, 4, 0, 0]} maxBarSize={50}>
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.score === 100 ? '#22c55e' : entry.score > 70 ? '#eab308' : '#ef4444'} />
@@ -120,7 +121,7 @@ const Dashboard: React.FC<DashboardProps> = ({ history, dataset, onNavigate }) =
                     )}
                     <div>
                       <p className="text-sm font-medium text-slate-900">{run.suiteName}</p>
-                      <p className="text-xs text-slate-500">{run.runTime}</p>
+                      <p className="text-xs text-slate-500">{formatDate(run.runTime)}</p>
                     </div>
                   </div>
                   <div className="text-right">

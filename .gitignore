@@ -1,2 +1,30 @@
-/.DS_Store
-/erro1
+# Intellij
+*.iml
+.idea
+
+# macOS
+DS_Store
+.DS_Store
+
+# Node
+node_modules
+package-lock.json
+
+# Python
+__pycache__
+
+# Docker
+Dockerfile
+
+# Backend
+backend/data
+
+# Frontend
+frontend/src/data
+
+# Logs
+logs
+
+# IDE
+.idea
+.vscode

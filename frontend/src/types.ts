@@ -72,6 +72,7 @@ export interface ValidationResult {
     unexpectedCount: number;
     unexpectedPercent: number;
     unexpectedList?: any[]; // Stores sample failed values
+    expectationConfig?: Record<string, any>;
   }[];
 }
 

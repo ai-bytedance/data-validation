@@ -19,6 +19,7 @@ const MainApp: React.FC = () => {
 
   // App State
   const [dataset, setDataset] = useState<Dataset | null>(null);
+  const [allDatasets, setAllDatasets] = useState<Dataset[]>([]);
   const [suites, setSuites] = useState<ExpectationSuite[]>([]);
   const [validationHistory, setValidationHistory] = useState<ValidationResult[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -41,7 +42,10 @@ const MainApp: React.FC = () => {
     const load = async () => {
       try {
         const ds = await api.getDatasets();
-        if (ds && ds.length > 0) setDataset(ds[0]);
+        setAllDatasets(ds || []);
+        // Removed auto-select to respect user request ("clear cache display")
+        // if (ds && ds.length > 0) setDataset(ds[0]); 
+
         const s = await api.getSuites();
         setSuites(s || []); // Guard against null
         const h = await api.getHistory();
@@ -57,10 +61,27 @@ const MainApp: React.FC = () => {
 
   const handleDatasetLoaded = (newDataset: Dataset) => {
     setDataset(newDataset);
+    setAllDatasets(prev => [...prev, newDataset]); // Add to list
     // Auto-create a default suite container for convenience
     if (suites.length === 0) {
       setSuites([{ id: generateId(), name: 'Default Suite', dataset_id: newDataset.id, expectations: [] }]);
     }
+  };
+
+  const handleDatasetDelete = async (id: string) => {
+    if (confirm(t.dataSource['deleteConfirm'])) {
+      try {
+        await api.deleteDataset(id);
+        setAllDatasets(prev => prev.filter(d => d.id !== id));
+        if (dataset?.id === id) setDataset(null); // Clear current if deleted
+      } catch (e) {
+        alert("Delete failed");
+      }
+    }
+  };
+
+  const handleDatasetSelect = (ds: Dataset) => {
+    setDataset(ds);
   };
 
   const handleSaveSuite = async (suite: ExpectationSuite) => {
@@ -87,6 +108,17 @@ const MainApp: React.FC = () => {
     setCurrentView('REPORTS');
   };
 
+  const handleRunDelete = async (id: string) => {
+    if (confirm(t.reports.deleteRunConfirm)) {
+      try {
+        await api.deleteRun(id);
+        setValidationHistory(prev => prev.filter(r => r.id !== id));
+      } catch (e) {
+        alert("Failed to delete run");
+      }
+    }
+  };
+
   const toggleLanguage = () => {
     setLanguage(language === 'zh' ? 'en' : 'zh');
   };
@@ -96,13 +128,19 @@ const MainApp: React.FC = () => {
       case 'DASHBOARD':
         return <Dashboard history={validationHistory} dataset={dataset} onNavigate={handleNav} />;
       case 'DATA_SOURCE':
-        return <DataSource onDataLoaded={handleDatasetLoaded} currentDataset={dataset} />;
+        return <DataSource
+          onDataLoaded={handleDatasetLoaded}
+          currentDataset={dataset}
+          allDatasets={allDatasets}
+          onDelete={handleDatasetDelete}
+          onSelect={handleDatasetSelect}
+        />;
       case 'SUITE_BUILDER':
         return <SuiteBuilder dataset={dataset} suites={suites} onSave={handleSaveSuite} />;
       case 'VALIDATION_RUNNER':
         return <ValidationRunner dataset={dataset} suites={suites} onRun={handleValidationRun} />;
       case 'REPORTS':
-        return <Reports history={validationHistory} />;
+        return <Reports history={validationHistory} onDelete={handleRunDelete} />;
       default:
         return <Dashboard history={validationHistory} dataset={dataset} onNavigate={handleNav} />;
     }

@@ -7,13 +7,15 @@ from typing import List, Dict, Any
 from ..models.models import Dataset, ExpectationSuite
 from . import ai_service
 import asyncio
+import time
 
 # Using Ephemeral Context for simpler dynamic setup
 context = gx.get_context(mode="ephemeral")
 
 async def run_validation(dataset: Dataset, suite: ExpectationSuite) -> Dict[str, Any]:
     datasource_name = "dynamic_datasource"
-    data_asset_name = f"asset_{dataset.id}"
+    # Use unique name to avoid 'Asset already exists' error in ephemeral context
+    data_asset_name = f"asset_{dataset.id}_{int(time.time()*1000)}"
     suite_name = f"suite_{suite.id}"
     
     # Separation of Concerns
@@ -34,11 +36,15 @@ async def run_validation(dataset: Dataset, suite: ExpectationSuite) -> Dict[str,
         gx_suite = context.create_expectation_suite(expectation_suite_name=suite_name, overwrite_existing=True)
         
     # 2. Add Expectations
-    # suite.expectations is a list of dicts: { "type": "...", "kwargs": {...} }
+    # suite.expectations is a list of dicts: { "type": "...", "kwargs": {...}, "column": "..." }
     for exp_data in standard_expectations:
+        kwargs = exp_data.get("kwargs", {}).copy() # Copy to avoid mutating original dict
+        if "column" in exp_data:
+            kwargs["column"] = exp_data["column"]
+            
         config = ExpectationConfiguration(
             expectation_type=exp_data["type"],
-            kwargs=exp_data.get("kwargs", {})
+            kwargs=kwargs
         )
         gx_suite.add_expectation(config)
     
@@ -58,11 +64,13 @@ async def run_validation(dataset: Dataset, suite: ExpectationSuite) -> Dict[str,
         datasource_name = "runtime_pandas"
         if datasource_name not in context.datasources:
              context.sources.add_pandas(datasource_name)
-             
-        batch_request = context.get_datasource(datasource_name).read_dataframe(
-            dataframe=df, 
-            asset_name=data_asset_name
-        )
+        
+        ds = context.get_datasource(datasource_name)
+        
+        # With unique asset name, we don't need to check for existence/delete
+        # Explicitly add asset and build batch request to ensure we get a BatchRequest object, not a Validator
+        asset = ds.add_dataframe_asset(name=data_asset_name, dataframe=df)
+        batch_request = asset.build_batch_request()
         
     elif dataset.db_config:
         # SQL Approach
@@ -116,18 +124,23 @@ async def run_validation(dataset: Dataset, suite: ExpectationSuite) -> Dict[str,
     checkpoint_name = f"ckpt_{suite.id}"
     
     # If we have 0 standard expectations, we might skip this or run empty for stats
+    # If we have 0 standard expectations, we might skip this or run empty for stats
     if standard_expectations:
+        # Define Checkpoint without runtime data (batch_request cannot be pickled)
         checkpoint = context.add_or_update_checkpoint(
             name=checkpoint_name,
-            validations=[
-                {
-                    "batch_request": batch_request,
-                    "expectation_suite_name": suite_name,
-                }
-            ]
+            expectation_suite_name=suite_name
         )
         try:
-            results = checkpoint.run()
+            # Pass runtime data (batch_request) directly to run()
+            results = checkpoint.run(
+                validations=[
+                    {
+                        "batch_request": batch_request,
+                        "expectation_suite_name": suite_name,
+                    }
+                ]
+            )
             result_dict = results.to_json_dict()
         except Exception as e:
             import traceback

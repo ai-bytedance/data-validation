@@ -1,17 +1,21 @@
 import React, { useRef, useState } from 'react';
 import { Dataset, DbConnectionConfig } from '../types';
 import { api } from '../api'; // Ensure api.ts has previewDataset method or we use ad-hoc fetch
-import { Upload, FileSpreadsheet, Table, Database, Server, Network, HardDrive, X, Loader2, Info, FileJson, File as FileIcon } from 'lucide-react';
+import { Upload, FileSpreadsheet, Table, Database, Server, Network, HardDrive, X, Loader2, Info, FileJson, File as FileIcon, Trash2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface DataSourceProps {
   onDataLoaded: (dataset: Dataset) => void;
   currentDataset: Dataset | null;
+  allDatasets?: Dataset[];
+  onDelete?: (id: string) => void;
+  onSelect?: (dataset: Dataset) => void;
 }
 
-const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset }) => {
+const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset, allDatasets, onDelete, onSelect }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   // DB Modal State
   const [showDbModal, setShowDbModal] = useState<string | null>(null);
@@ -228,6 +232,56 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset })
         {error && (
           <div className="mt-4 p-4 bg-red-50 text-red-600 rounded-lg text-sm font-medium">
             {error}
+          </div>
+        )}
+
+        {/* Recent Datasets List */}
+        {allDatasets && allDatasets.length > 0 && (
+          <div className="mt-8 pt-8 border-t border-slate-100">
+            <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><div className="w-2 h-8 bg-orange-500 rounded-full"></div>{t.dataSource['recent']}</h3>
+            <div className="grid grid-cols-1 gap-3">
+              {(showAll ? allDatasets : allDatasets.slice(0, 5)).map(ds => (
+                <div key={ds.id} className={`p-4 rounded-lg border flex justify-between items-center transition-all ${currentDataset?.id === ds.id ? 'bg-orange-50 border-orange-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
+                  <div className="flex-1 cursor-pointer" onClick={async () => {
+                    if (onSelect) {
+                      try {
+                        // Hydrate data (fetch preview rows)
+                        const fullDs = await api.getDataset(ds.id);
+                        onSelect(fullDs);
+                      } catch (e) {
+                        console.error("Failed to load dataset details", e);
+                        onSelect(ds);
+                      }
+                    }
+                  }}>
+                    <div className="font-bold text-slate-700">{ds.name}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{ds.created_at ? new Date(ds.created_at).toLocaleString() : 'Just now'}</div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {currentDataset?.id === ds.id && <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-1 rounded">{t.dataSource['active']}</span>}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete && onDelete(ds.id); }}
+                      className="text-slate-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                      title={t.dataSource['deleteTitle']}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {allDatasets.length > 5 && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  onClick={() => setShowAll(!showAll)}
+                  className="text-sm text-slate-500 hover:text-orange-600 font-medium flex items-center gap-1 px-4 py-2 hover:bg-slate-50 rounded-full transition-colors"
+                >
+                  {showAll ? t.dataSource.showLess : t.dataSource.showMore}
+                  {showAll ? <div className="rotate-180 transition-transform">^</div> : <div className="transition-transform">v</div>}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
