@@ -115,8 +115,14 @@ def preview_dataset(dataset: Dataset):
              
     elif dataset.db_config:
         try:
-            return get_db_preview(dataset.db_config)
+            print(f"[DEBUG] Attempting DB preview with config: {dataset.db_config}")
+            result = get_db_preview(dataset.db_config)
+            print(f"[DEBUG] DB preview successful")
+            return result
         except Exception as e:
+            import traceback
+            print(f"[ERROR] DB preview failed: {str(e)}")
+            traceback.print_exc()
             raise HTTPException(status_code=400, detail=str(e))
     return {"headers": [], "rows": []}
 

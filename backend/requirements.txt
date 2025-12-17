@@ -4,6 +4,9 @@ sqlmodel==0.0.22
 great_expectations==0.18.22
 pydantic-settings==2.7.0
 python-multipart==0.0.20
+# Database drivers
+pymysql==1.1.1
+psycopg2-binary==2.9.10
 # For AI
 google-generativeai==0.8.3
 openai==1.59.3

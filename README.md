@@ -40,7 +40,7 @@
 
 ```bash
 # 在项目根目录下运行
-docker compose up --build
+docker compose up --build 或 docker-compose up --build
 ```
 
 启动后访问：
@@ -124,6 +124,3 @@ OPENAI_API_KEY=your_openai_key_here
     *   保存规则套件 (Suite)。
 3.  **执行验证 (Validation Runner)**: 选择数据集和规则套件，点击 "Run Validation"。
 4.  **查看报告 (Reports)**: 查看验证结果详情、成功率及错误样本。
-
----
-Created by Antigravity

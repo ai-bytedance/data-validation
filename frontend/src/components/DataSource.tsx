@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Dataset, DbConnectionConfig } from '../types';
 import { api } from '../api'; // Ensure api.ts has previewDataset method or we use ad-hoc fetch
-import { Upload, FileSpreadsheet, Table, Database, Server, Network, HardDrive, X, Loader2, Info, FileJson, File as FileIcon, Trash2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, Table, Database, Server, Network, HardDrive, X, Loader2, Info, FileJson, File as FileIcon, Trash2, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface DataSourceProps {
@@ -20,17 +20,20 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset, a
   // DB Modal State
   const [showDbModal, setShowDbModal] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testSuccess, setTestSuccess] = useState<boolean | null>(null);
+  const [testError, setTestError] = useState<string | null>(null); // Separate error for test connection
+  const [showPassword, setShowPassword] = useState(false);
 
   // DB Form State
-  const [dbHost, setDbHost] = useState('localhost');
+  const [dbHost, setDbHost] = useState('');
   const [dbPort, setDbPort] = useState('');
-  const [dbUser, setDbUser] = useState('admin');
+  const [dbUser, setDbUser] = useState('');
   const [dbPass, setDbPass] = useState('');
-  const [dbName, setDbName] = useState('analytics_db');
-  const [dbTable, setDbTable] = useState('users');
-  const [sampleData, setSampleData] = useState<string>("");
+  const [dbName, setDbName] = useState('');
+  const [dbTable, setDbTable] = useState('');
 
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   // Simple UUID generator for non-secure contexts
   const generateId = () => {
@@ -78,18 +81,128 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset, a
 
   const openDbModal = (type: string) => {
     setShowDbModal(type);
-    // Set defaults based on type
-    if (type === 'MySQL') setDbPort('3306');
-    if (type === 'PostgreSQL') setDbPort('5432');
-    if (type === 'Hive') setDbPort('10000');
-    if (type === 'Neo4j') setDbPort('7687');
-    if (type === 'MongoDB') setDbPort('27017');
-    if (type === 'Oracle') setDbPort('1521');
-    if (type === 'SQL Server') setDbPort('1433');
-    if (type === 'SQLite') setDbPort('');
+    setTestSuccess(null);
+    setTestError(null);
+    setError(null);
+    setShowPassword(false);
 
-    // Pre-fill sample data to help user understand what to do
-    setSampleData("id,user_id,amount,status,created_at\\n1,u_101,99.50,completed,2023-01-01\\n2,u_102,12.00,pending,2023-01-02\\n3,u_103,45.00,failed,2023-01-03");
+    // Set database-specific defaults
+    if (type === 'SQLite') {
+      setDbHost('./data/database.db'); // SQLite file path
+      setDbPort('');
+      setDbUser('');
+      setDbPass('');
+      setDbName('');
+      setDbTable('');
+    } else if (type === 'MySQL') {
+      setDbHost('127.0.0.1');
+      setDbPort('3306');
+      setDbUser('root');
+      setDbPass('');
+      setDbName('');
+      setDbTable('');
+    } else if (type === 'PostgreSQL') {
+      setDbHost('127.0.0.1');
+      setDbPort('5432');
+      setDbUser('postgres');
+      setDbPass('');
+      setDbName('');
+      setDbTable('');
+    } else if (type === 'SQL Server') {
+      setDbHost('127.0.0.1');
+      setDbPort('1433');
+      setDbUser('sa');
+      setDbPass('');
+      setDbName('');
+      setDbTable('');
+    } else if (type === 'Oracle') {
+      setDbHost('127.0.0.1');
+      setDbPort('1521');
+      setDbUser('system');
+      setDbPass('');
+      setDbName('');
+      setDbTable('');
+    } else {
+      // MongoDB, Neo4j, Hive - generic defaults
+      setDbHost('127.0.0.1');
+      setDbPort('');
+      setDbUser('');
+      setDbPass('');
+      setDbName('');
+      setDbTable('');
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    setTestError(null); // Use testError instead of error
+    setTestSuccess(null);
+
+    try {
+      const dbConfig: DbConnectionConfig = {
+        type: showDbModal as any,
+        host: dbHost,
+        port: dbPort,
+        database: dbName,
+        username: dbUser,
+        password: dbPass,
+        table: dbTable
+      };
+
+      const tempDatasetForPreview: Partial<Dataset> = {
+        db_config: dbConfig
+      } as any;
+
+      await api.previewDataset(tempDatasetForPreview);
+      setTestSuccess(true);
+    } catch (e: any) {
+      setTestSuccess(false);
+      // Parse and translate common database errors
+      let errorMessage = e.message || t.dataSource.connectionFailed;
+
+      // Common error patterns and their translations
+      if (errorMessage.includes('Connection refused') || errorMessage.includes('Errno 111')) {
+        errorMessage = language === 'zh'
+          ? '连接被拒绝：无法连接到数据库服务器，请检查主机地址、端口和防火墙设置'
+          : 'Connection refused: Cannot connect to database server. Please check host, port, and firewall settings';
+      } else if (errorMessage.includes('Name or service not known') || errorMessage.includes('Errno -2')) {
+        errorMessage = language === 'zh'
+          ? '主机名无法解析：请检查主机地址是否正确'
+          : 'Hostname cannot be resolved: Please check if the host address is correct';
+      } else if (errorMessage.includes('Access denied')) {
+        errorMessage = language === 'zh'
+          ? '访问被拒绝：用户名或密码错误'
+          : 'Access denied: Incorrect username or password';
+      } else if (errorMessage.includes('Unknown database')) {
+        errorMessage = language === 'zh'
+          ? '数据库不存在：请检查数据库名称是否正确'
+          : 'Unknown database: Please check if the database name is correct';
+      } else if (errorMessage.includes('driver') || errorMessage.includes('not installed')) {
+        errorMessage = language === 'zh'
+          ? '数据库驱动未安装：' + errorMessage
+          : 'Database driver not installed: ' + errorMessage;
+      } else if (errorMessage.includes('syntax error')) {
+        errorMessage = language === 'zh'
+          ? 'SQL 语法错误：请检查表名和数据库配置是否正确'
+          : 'SQL syntax error: Please check if table name and database configuration are correct';
+      } else if (errorMessage.includes('no such table')) {
+        errorMessage = language === 'zh'
+          ? '表不存在：请检查表名是否正确'
+          : 'Table does not exist: Please check if the table name is correct';
+      } else if (errorMessage.includes('SQLite requires a database file path')) {
+        errorMessage = language === 'zh'
+          ? 'SQLite 需要数据库文件路径：请在"主机地址"或"数据库名"字段中指定 .db 文件的路径'
+          : 'SQLite requires a database file path: Please specify the .db file path in the "Host" or "Database" field';
+      } else if (errorMessage.includes('SQLite database file is invalid')) {
+        errorMessage = language === 'zh'
+          ? 'SQLite 数据库文件无效：请检查文件路径是否正确且文件可访问'
+          : 'SQLite database file is invalid: Please check if the file path is correct and accessible';
+      }
+
+      setTestError(errorMessage); // Use testError instead of error
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const handleDbConnect = () => {
@@ -97,14 +210,10 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset, a
     setError(null);
 
     // Validate inputs
-    if (!dbHost || !dbUser || !dbTable || !sampleData) {
-      // SQLite usually doesn't need user/host in same way, but for validation consistency we keep it
-      // Or we relax it for SQLite. Let's keep strict for now to ensure we get config values.
-      if (showDbModal !== 'SQLite' || !sampleData) {
-        setError(t.dataSource.validationError);
-        setIsConnecting(false);
-        return;
-      }
+    if (!dbHost || !dbUser || !dbTable) {
+      setError(t.dataSource.validationError);
+      setIsConnecting(false);
+      return;
     }
 
     // Simulate "Checking connection"
@@ -161,11 +270,11 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset, a
   const dbOptions = [
     { id: 'MySQL', icon: <Database className="text-blue-600" size={32} />, label: t.dataSource.dbMysql },
     { id: 'PostgreSQL', icon: <Server className="text-indigo-600" size={32} />, label: t.dataSource.dbPostgres },
-    { id: 'Hive', icon: <HardDrive className="text-yellow-600" size={32} />, label: t.dataSource.dbHive },
-    { id: 'Neo4j', icon: <Network className="text-green-600" size={32} />, label: t.dataSource.dbNeo4j },
-    { id: 'MongoDB', icon: <FileJson className="text-green-600" size={32} />, label: t.dataSource.dbMongo },
-    { id: 'Oracle', icon: <Database className="text-red-600" size={32} />, label: t.dataSource.dbOracle },
     { id: 'SQL Server', icon: <Server className="text-blue-800" size={32} />, label: t.dataSource.dbSqlServer },
+    { id: 'Oracle', icon: <Database className="text-red-600" size={32} />, label: t.dataSource.dbOracle },
+    { id: 'MongoDB', icon: <FileJson className="text-green-600" size={32} />, label: t.dataSource.dbMongo },
+    { id: 'Neo4j', icon: <Network className="text-green-600" size={32} />, label: t.dataSource.dbNeo4j },
+    { id: 'Hive', icon: <HardDrive className="text-yellow-600" size={32} />, label: t.dataSource.dbHive },
     { id: 'SQLite', icon: <FileIcon className="text-slate-600" size={32} />, label: t.dataSource.dbSqlite },
   ];
 
@@ -362,71 +471,121 @@ const DataSource: React.FC<DataSourceProps> = ({ onDataLoaded, currentDataset, a
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto">
-              <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg text-sm mb-6 flex gap-2">
-                <Info size={18} className="shrink-0 mt-0.5" />
+            <div className="p-8 overflow-y-auto">
+              <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg text-sm mb-8 flex gap-3">
+                <Info size={20} className="shrink-0 mt-0.5" />
                 <div>
                   {t.dataSource.dbDisclaimer}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="space-y-4">
-                  <h4 className="font-bold text-slate-700 text-sm border-b pb-2">{t.dataSource.configSection}</h4>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">{t.dataSource.dbHost}</label>
-                    <input value={dbHost} onChange={e => setDbHost(e.target.value)} type="text" className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">{t.dataSource.dbPort}</label>
-                      <input value={dbPort} onChange={e => setDbPort(e.target.value)} type="text" className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">{t.dataSource.dbUser}</label>
-                      <input value={dbUser} onChange={e => setDbUser(e.target.value)} type="text" className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">{t.dataSource.dbName}</label>
-                      <input value={dbName} onChange={e => setDbName(e.target.value)} type="text" className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">{t.dataSource.dbPass}</label>
-                      <input value={dbPass} onChange={e => setDbPass(e.target.value)} type="password" placeholder="••••••" className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">{t.dataSource.dbTable}</label>
-                    <input value={dbTable} onChange={e => setDbTable(e.target.value)} type="text" placeholder="users" className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                  </div>
-                </div>
+              <div className="max-w-2xl mx-auto">
+                <div className="space-y-5">
+                  <h4 className="font-bold text-slate-700 text-base border-b pb-3">{t.dataSource.configSection}</h4>
 
-                <div className="space-y-4 flex flex-col">
-                  <h4 className="font-bold text-slate-700 text-sm border-b pb-2">{t.dataSource.sampleSection}</h4>
-                  <div className="flex-1 flex flex-col">
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">{t.dataSource.sampleLabel}</label>
-                    <p className="text-xs text-slate-400 mb-2">{t.dataSource.sampleDesc}</p>
-                    <textarea
-                      value={sampleData}
-                      onChange={e => setSampleData(e.target.value)}
-                      className="flex-1 w-full border border-slate-300 rounded px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none min-h-[150px]"
-                      placeholder="id,name,age&#10;1,John,30&#10;2,Jane,25"
-                    />
+                  {/* SQLite-specific configuration */}
+                  {showDbModal === 'SQLite' ? (
+                    <>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-600 mb-2">{t.dataSource.sqliteFilePath}</label>
+                        <input
+                          value={dbHost}
+                          onChange={e => setDbHost(e.target.value)}
+                          type="text"
+                          placeholder={t.dataSource.sqliteFilePathPlaceholder}
+                          className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <p className="text-xs text-slate-500 mt-2">{t.dataSource.sqliteFilePathDesc}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-600 mb-2">{t.dataSource.dbTable}</label>
+                        <input value={dbTable} onChange={e => setDbTable(e.target.value)} type="text" placeholder="users" className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      </div>
+                    </>
+                  ) : (
+                    /* Network database configuration */
+                    <>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-600 mb-2">{t.dataSource.dbHost}</label>
+                        <input value={dbHost} onChange={e => setDbHost(e.target.value)} type="text" className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-600 mb-2">{t.dataSource.dbPort}</label>
+                          <input value={dbPort} onChange={e => setDbPort(e.target.value)} type="text" className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-600 mb-2">{t.dataSource.dbUser}</label>
+                          <input value={dbUser} onChange={e => setDbUser(e.target.value)} type="text" className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-600 mb-2">{t.dataSource.dbName}</label>
+                          <input value={dbName} onChange={e => setDbName(e.target.value)} type="text" className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-600 mb-2">{t.dataSource.dbPass}</label>
+                          <div className="relative">
+                            <input
+                              value={dbPass}
+                              onChange={e => setDbPass(e.target.value)}
+                              type={showPassword ? "text" : "password"}
+                              placeholder={t.dataSource.passwordPlaceholder}
+                              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 pr-10 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                              title={showPassword ? t.dataSource.hidePassword : t.dataSource.showPassword}
+                            >
+                              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-600 mb-2">{t.dataSource.dbTable}</label>
+                        <input value={dbTable} onChange={e => setDbTable(e.target.value)} type="text" placeholder="users" className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Test Connection Button */}
+                  <div className="pt-2">
+                    <button
+                      onClick={handleTestConnection}
+                      disabled={isTesting}
+                      className="w-full bg-slate-100 text-slate-700 px-4 py-2.5 rounded-lg hover:bg-slate-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed font-medium border border-slate-300 transition-colors"
+                    >
+                      {isTesting ? <Loader2 className="animate-spin" size={18} /> : null}
+                      {isTesting ? t.dataSource.connecting : t.dataSource.testConnection}
+                    </button>
+                    {testSuccess === true && (
+                      <div className="mt-3 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm flex items-center gap-2">
+                        <CheckCircle size={16} />
+                        {t.dataSource.connectionSuccess}
+                      </div>
+                    )}
+                    {testSuccess === false && (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                        {testError || t.dataSource.connectionFailed}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
-              <button onClick={() => setShowDbModal(null)} className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium">
+            <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-end gap-4">
+              <button onClick={() => setShowDbModal(null)} className="px-6 py-2.5 text-slate-600 hover:text-slate-800 font-medium rounded-lg hover:bg-slate-100 transition-colors">
                 {t.builder.btnClose}
               </button>
               <button
                 onClick={handleDbConnect}
                 disabled={isConnecting}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed font-medium shadow-sm"
+                className="bg-blue-600 text-white px-8 py-2.5 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed font-medium shadow-sm transition-colors"
               >
                 {isConnecting ? <Loader2 className="animate-spin" size={18} /> : null}
                 {isConnecting ? t.dataSource.connecting : t.dataSource.btnConnect}

@@ -122,8 +122,11 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dataset)
         });
-        // We allow error to propagate or handle gracefully
-        if (!res.ok) throw new Error('Preview failed');
+        // Extract the actual error message from backend
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({ detail: 'Preview failed' }));
+            throw new Error(errorData.detail || 'Preview failed');
+        }
         return res.json();
     }
 };
